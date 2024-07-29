@@ -1,6 +1,11 @@
-#include <DS3231.h>
-#include <LedControl.h>
+#include "DS3231.h"
+#include <EEPROM.h>
+#include "LedControl.h"
 #include <Wire.h>
+
+#define EEPROM_ID_ADDR 1023
+#define EEPROM_ID 100
+#define IS24HOUR_EEPROM_ADDR 0
 
 #define MENU_PIN 5
 #define UP_PIN 6
@@ -20,14 +25,15 @@ enum Mode
   SetHours = 1,
   SetMinutes = 2,
   Set24Hour = 3,
-  Confirm = 4
+  Confirm = 4,
 };
 
 int hours, minutes, seconds;
 
 Mode mode = Mode::Clock;
 
-bool is24Hour = false;
+bool is24Hour = true;
+int hours_adj; // holds 12/24 hour time while hours always has 24h
 int hours_one;
 int hours_ten;
 int minutes_one;
@@ -130,6 +136,13 @@ void setup()
   pinMode(MENU_PIN, INPUT_PULLUP);
   pinMode(UP_PIN, INPUT_PULLUP);
   pinMode(DOWN_PIN, INPUT_PULLUP);
+
+  // EEPROM
+  if (EEPROM.read(EEPROM_ID_ADDR) != EEPROM_ID) {
+    EEPROM.put(EEPROM_ID_ADDR, EEPROM_ID);
+    EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
+  }
+  EEPROM.get(IS24HOUR_EEPROM_ADDR, is24Hour);
 }
 
 void loop()
@@ -138,8 +151,6 @@ void loop()
   {
     delay(300);
     mode = (Mode)(mode + 1);
-    if (mode > Mode::Confirm)
-      mode = Mode::Clock;
   }
 
   if (mode == Mode::Clock)
@@ -150,17 +161,10 @@ void loop()
     minutes = dt.minute;
     seconds = dt.second;
 
-    if (!is24Hour)
-    {
-      if (hours > 12)
-        hours = hours - 12;
+    hours_adj = is24Hour ? hours : (hours + 11) % 12 + 1; 
 
-      if (hours == 0)
-        hours = 1;
-    }
-
-    hours_one = hours % 10;
-    hours_ten = hours / 10;
+    hours_one = hours_adj % 10;
+    hours_ten = hours_adj / 10;
 
     minutes_one = minutes % 10;
     minutes_ten = minutes / 10;
@@ -252,11 +256,12 @@ void loop()
       lc.setColumn(0, 5, number[hours_one]);
       lc.setColumn(0, 6, number[hours_ten]);
     }
+  }
 
-    if (mode == Mode::Confirm)
-    {
-      rtc.setDateTime(2024, 71, 23, hours, minutes, 01);
-      mode = Mode::Clock;
-    }
+  else if (mode == Mode::Confirm)
+  {
+    rtc.setDateTime(2024, 7, 29, hours, minutes, 01);
+    EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
+    mode = Mode::Clock;
   }
 }

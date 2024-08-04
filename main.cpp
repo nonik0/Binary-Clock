@@ -4,8 +4,9 @@
 #include <Wire.h>
 
 #define EEPROM_ID_ADDR 1023
-#define EEPROM_ID 100
+#define EEPROM_ID 101
 #define IS24HOUR_EEPROM_ADDR 0
+#define BRIGHTNESS_EEPROM_ADDR 0
 
 #define MENU_PIN 5
 #define UP_PIN 6
@@ -25,13 +26,15 @@ enum Mode
   SetHours = 1,
   SetMinutes = 2,
   Set24Hour = 3,
-  Confirm = 4,
+  SetBrightness = 4,
+  Confirm = 5,
 };
 
 int hours, minutes, seconds;
 
 Mode mode = Mode::Clock;
 
+int brightness = 2;
 bool is24Hour = true;
 int hours_adj; // holds 12/24 hour time while hours always has 24h
 int hours_one;
@@ -43,17 +46,13 @@ int seconds_ten;
 
 void setup()
 {
-  // Serial.begin(9600);
   /*
  The MAX72XX is in power-saving mode on startup,
  we have to do a wakeup call
  */
   lc.shutdown(0, false);
-  /* Set the brightness to a medium values */
-  lc.setIntensity(0, 2); // intensity  the brightness of the display. (0..15)
-  /* and clear the display */
+  lc.setIntensity(0, brightness); // intensity  the brightness of the display. (0..15)
   lc.clearDisplay(0);
-  // lc.setLed(0,row,col,true);
 
   delay(2000);
 
@@ -131,8 +130,7 @@ void setup()
 
   // Initialize DS3231
   rtc.begin();
-  // Set sketch compiling time
-  // clock.setDateTime(__DATE__, __TIME__);
+
   pinMode(MENU_PIN, INPUT_PULLUP);
   pinMode(UP_PIN, INPUT_PULLUP);
   pinMode(DOWN_PIN, INPUT_PULLUP);
@@ -141,8 +139,10 @@ void setup()
   if (EEPROM.read(EEPROM_ID_ADDR) != EEPROM_ID) {
     EEPROM.put(EEPROM_ID_ADDR, EEPROM_ID);
     EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
+    EEPROM.put(BRIGHTNESS_EEPROM_ADDR, brightness);
   }
   EEPROM.get(IS24HOUR_EEPROM_ADDR, is24Hour);
+  EEPROM.get(BRIGHTNESS_EEPROM_ADDR, brightness);
 }
 
 void loop()
@@ -258,10 +258,41 @@ void loop()
     }
   }
 
+  else if (mode == Mode::SetBrightness)
+  {
+    if (digitalRead(UP_PIN) == 0)
+    {
+      delay(300);
+      brightness++;
+      if (brightness > 3)
+        brightness = 0;
+      lc.setIntensity(0, brightness);
+    }
+    if (digitalRead(DOWN_PIN) == 0)
+    {
+      delay(300);
+      brightness--;
+      if (brightness < 0)
+        brightness = 3;
+      lc.setIntensity(0, brightness);
+    }
+
+    unsigned char brightIndicator = B00000000;
+    for(int i = 0; i < brightness + 1; i++)
+      brightIndicator = (brightIndicator >> 1) | B01000000;
+    lc.setColumn(0, 1, B01111000 & brightIndicator);
+    lc.setColumn(0, 2, B01110000 & brightIndicator);
+    lc.setColumn(0, 3, B01100000 & brightIndicator);
+    lc.setColumn(0, 4, B01000000 & brightIndicator);
+    lc.setColumn(0, 5, B00000000);
+    lc.setColumn(0, 6, B00000000);
+  }
+
   else if (mode == Mode::Confirm)
   {
     rtc.setDateTime(2024, 7, 29, hours, minutes, 01);
     EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
+    EEPROM.put(BRIGHTNESS_EEPROM_ADDR, brightness);
     mode = Mode::Clock;
   }
 }

@@ -4,9 +4,9 @@
 #include <Wire.h>
 
 #define EEPROM_ID_ADDR 1023
-#define EEPROM_ID 101
+#define EEPROM_ID 100
 #define IS24HOUR_EEPROM_ADDR 0
-#define BRIGHTNESS_EEPROM_ADDR 0
+#define BRIGHTNESS_EEPROM_ADDR 1
 
 #define MENU_PIN 5
 #define UP_PIN 6
@@ -46,6 +46,22 @@ int seconds_ten;
 
 void setup()
 {
+  // Initialize DS3231
+  rtc.begin();
+
+  pinMode(MENU_PIN, INPUT_PULLUP);
+  pinMode(UP_PIN, INPUT_PULLUP);
+  pinMode(DOWN_PIN, INPUT_PULLUP);
+
+  // EEPROM
+  if (EEPROM.read(EEPROM_ID_ADDR) != EEPROM_ID) {
+    EEPROM.put(EEPROM_ID_ADDR, EEPROM_ID);
+    EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
+    EEPROM.put(BRIGHTNESS_EEPROM_ADDR, brightness);
+  }
+  EEPROM.get(IS24HOUR_EEPROM_ADDR, is24Hour);
+  EEPROM.get(BRIGHTNESS_EEPROM_ADDR, brightness);
+
   /*
  The MAX72XX is in power-saving mode on startup,
  we have to do a wakeup call
@@ -127,22 +143,6 @@ void setup()
   delay(200);
   lc.setRow(0, 1, B00000000);
   delay(600);
-
-  // Initialize DS3231
-  rtc.begin();
-
-  pinMode(MENU_PIN, INPUT_PULLUP);
-  pinMode(UP_PIN, INPUT_PULLUP);
-  pinMode(DOWN_PIN, INPUT_PULLUP);
-
-  // EEPROM
-  if (EEPROM.read(EEPROM_ID_ADDR) != EEPROM_ID) {
-    EEPROM.put(EEPROM_ID_ADDR, EEPROM_ID);
-    EEPROM.put(IS24HOUR_EEPROM_ADDR, is24Hour);
-    EEPROM.put(BRIGHTNESS_EEPROM_ADDR, brightness);
-  }
-  EEPROM.get(IS24HOUR_EEPROM_ADDR, is24Hour);
-  EEPROM.get(BRIGHTNESS_EEPROM_ADDR, brightness);
 }
 
 void loop()
